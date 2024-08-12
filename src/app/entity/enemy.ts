@@ -1,3 +1,12 @@
+export type TInemyProps = [
+  x: number,
+  y: number,
+  radius: number,
+  color: string,
+  velocity: { x: number; y: number },
+  c: CanvasRenderingContext2D
+];
+
 class Enemy {
   x: number;
   y: number;

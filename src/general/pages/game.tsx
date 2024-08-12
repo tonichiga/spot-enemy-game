@@ -1,5 +1,6 @@
 "use client";
 import Enemy from "@/app/entity/enemy";
+import EnemyBounty from "@/app/entity/enemy-bounty";
 import Player from "@/app/entity/player";
 import Projectile from "@/app/entity/projectile";
 import { MouseEventHandler, useEffect, useLayoutEffect, useRef } from "react";
@@ -10,6 +11,7 @@ const Main = () => {
 
   useLayoutEffect(() => {
     const enemies = [];
+    const bountyEnemies = [];
 
     const height = window.innerHeight;
     const width = window.innerWidth;
@@ -38,30 +40,63 @@ const Main = () => {
     c.strokeStyle = "blue";
     c.stroke();
 
-    // setInterval(() => {
-    const enemyRadius = Math.random() * (30 - 4) + 4;
+    setInterval(() => {
+      const enemyRadius = Math.random() * (30 - 10) + 10;
 
-    let x;
-    let y;
+      let x;
+      let y;
 
-    if (Math.random() < 0.5) {
-      x = Math.random() < 0.5 ? 0 - enemyRadius : width + enemyRadius;
-      y = Math.random() * height;
-    } else {
-      x = Math.random() * width;
-      y = Math.random() < 0.5 ? 0 - enemyRadius : height + enemyRadius;
-    }
+      if (Math.random() < 0.5) {
+        x = Math.random() < 0.5 ? 0 - enemyRadius : width + enemyRadius;
+        y = Math.random() * height;
+      } else {
+        x = Math.random() * width;
+        y = Math.random() < 0.5 ? 0 - enemyRadius : height + enemyRadius;
+      }
 
-    const color = "red";
-    const angle = Math.atan2(height / 2 - y, width / 2 - x);
+      const color = "red";
 
-    const velocity = {
-      x: Math.cos(angle),
-      y: Math.sin(angle),
-    };
+      const angle = Math.atan2(
+        Math.random() * 100 - 100 / 2,
+        Math.random() * 100 - 100 / 2
+      );
 
-    enemies.push(new Enemy(x, y, radius, color, velocity, c));
-    // }, 1000);
+      const velocity = {
+        x: Math.cos(angle),
+        y: Math.sin(angle),
+      };
+
+      enemies.push(new Enemy(x, y, enemyRadius, color, velocity, c));
+    }, 4000);
+
+    setInterval(() => {
+      const enemyRadius = Math.random() * (30 - 10) + 10;
+
+      const angle = Math.atan2(height / 2 - height / 2, width / 2 - width / 2);
+      const velocity = {
+        x: Math.cos(angle),
+        y: Math.sin(angle),
+      };
+
+      let x;
+      let y;
+
+      if (Math.random() < 0.5) {
+        x = Math.random() < 0.5 ? 0 - enemyRadius : width + enemyRadius;
+        y = Math.random() * height;
+      } else {
+        x = Math.random() * width;
+        y = Math.random() < 0.5 ? 0 - enemyRadius : height + enemyRadius;
+      }
+
+      bountyEnemies.push(new EnemyBounty(x, y, 30, "red", null, c));
+    }, 3000);
+
+    setInterval(() => {
+      bountyEnemies.forEach((enemy: EnemyBounty, index) => {
+        enemy.update();
+      });
+    }, 1000);
 
     function animate() {
       let animationFrameId = requestAnimationFrame(animate);
@@ -86,8 +121,13 @@ const Main = () => {
               enemies.splice(index, 1);
               projectilesRef.current.splice(projectileIndex, 1);
             }
+
+            if (projectile.x - projectile.radius > canvasWidth) {
+              projectilesRef.current.splice(projectileIndex, 1);
+            }
           }
         );
+        console.log(projectilesRef.current.length);
 
         const distanceToPlayer = Math.hypot(
           player.x - enemy.x,
