@@ -11,6 +11,7 @@ export class GameScene extends Scene {
 
   constructor() {
     super({ key: "GameScene" });
+    this.detectColisions = this.detectColisions.bind(this);
   }
 
   preload() {
@@ -36,6 +37,8 @@ export class GameScene extends Scene {
     this.input.keyboard.on("keydown-R", () => {
       this.scene.restart();
     });
+
+    this.physics.world.createDebugGraphic().setAlpha(0.75);
   }
 
   update() {
@@ -44,7 +47,7 @@ export class GameScene extends Scene {
     this.updateBulletPostion();
     this.updatePlayerPosition();
 
-    if (this.isEnemyLessThan(5)) this.respawnEnemy();
+    if (this.isEnemyLessThan(6)) this.respawnEnemy();
   }
 
   detectCursorPosition() {
@@ -212,18 +215,21 @@ export class GameScene extends Scene {
       // enemy.setPosition(-100, -100);
     };
 
-    const handleBulletCollision = (enemy, bullet) => {
-      bullet.setVisible(false);
-      bullet.setActive(false);
-      // bullet.setPosition(-100, -100);
+    const handleBulletCollision = (bullet, enemy) => {
+      // bullet.setVisible(false);
+      // bullet.setActive(false);
+
+      bullet.destroy();
+      // enemy.destroy();
 
       enemy.setVisible(false);
       enemy.setActive(false);
-      // enemy.setPosition(-100, -100);
 
       // Обновление счета
       this.updateScore();
       this.updateScoreText();
+
+      console.log("SHOT");
     };
 
     const collisions = {
@@ -325,6 +331,7 @@ export class GameScene extends Scene {
       enemy.setPosition(x, y);
       enemy.setTexture("enemy");
       enemy.setScale(0.2);
+      enemy.body.setSize(300, 300);
 
       enemy.setVelocity(
         Phaser.Math.Between(-100, 100),
