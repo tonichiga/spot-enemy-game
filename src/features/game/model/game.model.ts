@@ -8,10 +8,16 @@ export class GameScene extends Scene {
   score: number = 0;
   scoreText: Phaser.GameObjects.Text;
   keys: { [key: string]: Phaser.Input.Keyboard.Key };
+  startButton: Phaser.GameObjects.Text;
+  restartButton: Phaser.GameObjects.Text;
+  startScreen: Phaser.GameObjects.Container;
+  startText: Phaser.GameObjects.Text;
+  isGameStarted: boolean = false;
 
   constructor() {
     super({ key: "GameScene" });
-    this.detectColisions = this.detectColisions.bind(this);
+    this.detectCollisions = this.detectCollisions.bind(this);
+    this.restartGame = this.restartGame.bind(this);
   }
 
   preload() {
@@ -21,24 +27,20 @@ export class GameScene extends Scene {
   }
 
   create() {
-    // Включаем физику для сцены
-    this.physics.world.setBounds(0, 0, this.scale.width, this.scale.height);
+    this.physics.world.createDebugGraphic().setAlpha(0.75); // For debug
+    this.setupPhysics();
+    this.createGameObjects();
+    this.detectCollisions();
+    this.prepareGame();
 
-    this.createPlayer();
-    this.createBullets();
-    this.createEnemies();
-
-    this.createScoreText();
-
-    this.detectColisions();
-
-    this.input.on("pointerdown", this.shoot, this);
-    this.cursors = this.input.keyboard.createCursorKeys(); // Создание клавиш для управления
-    this.input.keyboard.on("keydown-R", () => {
-      this.scene.restart();
-    });
-
-    this.physics.world.createDebugGraphic().setAlpha(0.75);
+    // Проверка состояния игры
+    if (!this.isGameStarted) {
+      this.hideGameObjects();
+      this.showStartScreen();
+      this.physics.pause();
+    } else {
+      this.physics.resume();
+    }
   }
 
   update() {
@@ -208,19 +210,17 @@ export class GameScene extends Scene {
     });
   }
 
-  detectColisions() {
+  detectCollisions() {
     const handleEnemyCollision = (_, enemy) => {
       enemy.setVisible(false);
       enemy.setActive(false);
-      // enemy.setPosition(-100, -100);
+
+      this.gameOver();
+      this.renderRestartButton();
     };
 
     const handleBulletCollision = (bullet, enemy) => {
-      // bullet.setVisible(false);
-      // bullet.setActive(false);
-
       bullet.destroy();
-      // enemy.destroy();
 
       enemy.setVisible(false);
       enemy.setActive(false);
@@ -228,8 +228,6 @@ export class GameScene extends Scene {
       // Обновление счета
       this.updateScore();
       this.updateScoreText();
-
-      console.log("SHOT");
     };
 
     const collisions = {
@@ -272,6 +270,10 @@ export class GameScene extends Scene {
   }
 
   shoot(pointer: Phaser.Input.Pointer) {
+    if (this.physics.world.isPaused) {
+      return;
+    }
+
     const bullet = this.bullets.get() as Phaser.Physics.Arcade.Sprite;
 
     if (bullet) {
@@ -344,5 +346,137 @@ export class GameScene extends Scene {
 
   isEnemyLessThan(count: number) {
     return this.enemies.countActive() < count;
+  }
+
+  renderRestartButton() {
+    this.add
+      .text(
+        this.scale.width / 2.2 - 100,
+        this.scale.height / 2.2 - 100,
+        "Game Over",
+        {
+          fontSize: "64px",
+          color: "#fff",
+        }
+      )
+      .setScrollFactor(0);
+
+    this.restartButton = this.add
+      .text(this.scale.width / 2.2 - 100, this.scale.height / 2.2, "Restart", {
+        fontSize: "32px",
+        color: "#fff",
+      })
+      .setScrollFactor(0);
+
+    // Эффект наведения
+    this.restartButton.on("pointerover", () => {
+      this.restartButton.setStyle({ fill: "#f39c12" });
+      this.input.setDefaultCursor("pointer");
+    });
+
+    // Убираем эффект наведения
+    this.restartButton.on("pointerout", () => {
+      this.restartButton.setStyle({ fill: "#fff" });
+      this.input.setDefaultCursor("default");
+    });
+  }
+
+  gameOver() {
+    this.physics.pause(); // Останавливаем всю физику
+    this.player.setTint(0xff0000); // Эффект поражения (например, красный оттенок)
+    this.renderRestartButton();
+    this.restartGame();
+  }
+
+  restartGame() {
+    this.score = 0;
+    this.restartButton.setInteractive(); // Делаем кнопку интерактивной
+    this.restartButton.on("pointerdown", () => {
+      this.scene.restart(); // Перезапуск сцены
+      this.input.setDefaultCursor("default");
+    });
+  }
+
+  startGame() {
+    this.physics.resume(); // Запускаем физику
+    this.input.setDefaultCursor("default");
+    this.showGameObjects();
+    this.isGameStarted = true;
+    this.startScreen.destroy();
+    console.log("Game started");
+  }
+
+  showStartScreen() {
+    this.startText = this.add.text(
+      this.scale.width / 2,
+      this.scale.height / 2 - 50,
+      "Start Game",
+      { fontSize: "32px", color: "#fff" }
+    );
+    this.startText.setOrigin(0.5);
+
+    this.startButton = this.add.text(
+      this.scale.width / 2,
+      this.scale.height / 2,
+      "Click to Start",
+      { fontSize: "24px", color: "#f39c12" }
+    );
+    this.startButton.setOrigin(0.5);
+    this.startButton.setInteractive();
+
+    this.startButton.on("pointerover", () => {
+      this.startButton.setStyle({ fill: "#fff" });
+      this.input.setDefaultCursor("pointer");
+    });
+
+    this.startButton.on("pointerout", () => {
+      this.startButton.setStyle({ fill: "#f39c12" });
+      this.input.setDefaultCursor("default");
+    });
+
+    this.startButton.on("pointerdown", () => {
+      this.startGame();
+    });
+
+    this.startScreen = this.add.container(0, 0, [
+      this.startText,
+      this.startButton,
+    ]);
+  }
+
+  hideGameObjects() {
+    this.scoreText.setVisible(false);
+    this.player.setVisible(false);
+    this.enemies.children.iterate((enemy) => {
+      const npc = enemy as Phaser.Physics.Arcade.Sprite;
+      npc.setVisible(false);
+      return true;
+    });
+  }
+
+  showGameObjects() {
+    this.scoreText.setVisible(true);
+    this.player.setVisible(true);
+    this.enemies.children.iterate((enemy) => {
+      const npc = enemy as Phaser.Physics.Arcade.Sprite;
+      npc.setVisible(true);
+      return true;
+    });
+  }
+
+  createGameObjects() {
+    this.createPlayer();
+    this.createBullets();
+    this.createEnemies();
+    this.createScoreText();
+  }
+
+  prepareGame() {
+    this.input.on("pointerdown", this.shoot, this);
+    this.cursors = this.input.keyboard.createCursorKeys(); // Создание клавиш для управления
+  }
+
+  setupPhysics() {
+    this.physics.world.setBounds(0, 0, this.scale.width, this.scale.height);
   }
 }
