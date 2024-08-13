@@ -22,7 +22,7 @@ export class GameScene extends Scene {
 
   preload() {
     this.load.image("player", "/assets/goliath.png");
-    this.load.image("enemy", "/assets/enemy.png");
+    this.load.image("enemy", "/assets/boss.png");
     this.load.image("bullet", "/assets/star.png");
   }
 
@@ -77,17 +77,17 @@ export class GameScene extends Scene {
 
     // Управление движением игрока
     if (this.keys.left.isDown) {
-      this.player.setVelocityX(-160);
+      this.player.setVelocityX(-300);
     } else if (this.keys.right.isDown) {
-      this.player.setVelocityX(160);
+      this.player.setVelocityX(300);
     } else {
       this.player.setVelocityX(0);
     }
 
     if (this.keys.up.isDown) {
-      this.player.setVelocityY(-160);
+      this.player.setVelocityY(-300);
     } else if (this.keys.down.isDown) {
-      this.player.setVelocityY(160);
+      this.player.setVelocityY(300);
     } else {
       this.player.setVelocityY(0);
     }
@@ -108,7 +108,8 @@ export class GameScene extends Scene {
     // Создание группы пуль
     this.bullets = this.physics.add.group({
       defaultKey: "bullet",
-      maxSize: 10, // Максимальное количество пуль на экране
+      setScale: { x: 1, y: 1 }, // Масштабирование пуль
+      maxSize: 1, // Максимальное количество пуль на экране
     });
 
     // Удаление пуль за пределами экрана
