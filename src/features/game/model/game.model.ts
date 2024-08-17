@@ -1,37 +1,56 @@
 import { Scene } from "phaser";
+import SmallEnemy from "./enemies/small-enemy";
+import Player from "./player.module";
+import Enemy from "./enemies/enemy.entity";
 
 export class GameScene extends Scene {
   cursors: Phaser.Types.Input.Keyboard.CursorKeys;
-  player: Phaser.Physics.Arcade.Sprite;
-  enemies: Phaser.Physics.Arcade.Group;
+  player: Player;
+  enemiesSmall: Phaser.Physics.Arcade.Group;
   bullets: Phaser.Physics.Arcade.Group;
+  map: Phaser.GameObjects.TileSprite;
   score: number = 0;
   scoreText: Phaser.GameObjects.Text;
-  keys: { [key: string]: Phaser.Input.Keyboard.Key };
   startButton: Phaser.GameObjects.Text;
   restartButton: Phaser.GameObjects.Text;
   startScreen: Phaser.GameObjects.Container;
   startText: Phaser.GameObjects.Text;
   isGameStarted: boolean = false;
+  worldWidth: number = 3000;
+  worldHeight: number = 2000;
+  coordinateText: Phaser.GameObjects.Text;
+  damageText: Phaser.GameObjects.Text[];
+  keys: { [key: string]: Phaser.Input.Keyboard.Key };
 
   constructor() {
     super({ key: "GameScene" });
     this.detectCollisions = this.detectCollisions.bind(this);
     this.restartGame = this.restartGame.bind(this);
+    this.shoot = this.shoot.bind(this);
   }
 
   preload() {
     this.load.image("player", "/assets/goliath.png");
-    this.load.image("enemy", "/assets/boss.png");
+    this.load.image("enemy_small", "/assets/small.png");
+    this.load.image("enemy_medium", "/assets/medium.png");
     this.load.image("bullet", "/assets/star.png");
+    this.load.image("map", "/assets/map.png");
   }
 
   create() {
+    // this.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
     this.physics.world.createDebugGraphic().setAlpha(0.75); // For debug
     this.setupPhysics();
     this.createGameObjects();
+
     this.detectCollisions();
+    this.setControls();
     this.prepareGame();
+
+    // Ограничиваем движение игрока внутри мира
+    this.physics.world.setBounds(0, 0, this.worldWidth, this.worldHeight);
+    this.cameras.main.setBounds(0, 0, this.worldWidth, this.worldHeight);
+    this.cameras.main.startFollow(this.player, true, 0.7, 0.7);
 
     // Проверка состояния игры
     if (!this.isGameStarted) {
@@ -44,171 +63,32 @@ export class GameScene extends Scene {
   }
 
   update() {
-    this.setPlayerControls();
-    this.updateEnemyPosition();
-    this.updateBulletPostion();
-    this.updatePlayerPosition();
+    this.handleMap().update();
+    this.handlePlayer().update();
+    this.handleEnemiesSmall().update();
+    this.handleBullets().update();
+    this.handleCoordinates().update();
+
+    if (this.input.activePointer.isDown) {
+      this.player.updatePlayerRotationAndMovement(this, [this.enemiesSmall]);
+    }
 
     if (this.isEnemyLessThan(6)) this.respawnEnemy();
   }
 
-  detectCursorPosition() {
-    // Получаем позицию курсора
-    const cursorX = this.input.x;
-    const cursorY = this.input.y;
-
-    return {
-      cursorX,
-      cursorY,
-    };
-  }
-
-  setPlayerControls() {
-    this.keys = {
-      up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-      left: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-      down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-      right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+  detectAngleByDirection(direction: string) {
+    const angleMap = {
+      right: 0,
+      left: Math.PI,
+      top: -Math.PI / 2,
+      bottom: Math.PI / 2,
+      "left-top": Math.PI + Math.PI / 4,
+      "right-top": -Math.PI / 4,
+      "left-bottom": Math.PI + -Math.PI / 4,
+      "right-bottom": Math.PI / 4,
     };
 
-    if (this.cursors.space.isDown) {
-      this.shoot(this.input.activePointer);
-    }
-
-    // Управление движением игрока
-    if (this.keys.left.isDown) {
-      this.player.setVelocityX(-300);
-    } else if (this.keys.right.isDown) {
-      this.player.setVelocityX(300);
-    } else {
-      this.player.setVelocityX(0);
-    }
-
-    if (this.keys.up.isDown) {
-      this.player.setVelocityY(-300);
-    } else if (this.keys.down.isDown) {
-      this.player.setVelocityY(300);
-    } else {
-      this.player.setVelocityY(0);
-    }
-  }
-
-  createPlayer() {
-    // Добавляем игрока в центр экрана
-    this.player = this.physics.add.sprite(
-      this.scale.width / 2,
-      this.scale.height / 2,
-      "player"
-    );
-
-    this.player.setCollideWorldBounds(true); // Игрок не выйдет за пределы экрана
-  }
-
-  createBullets() {
-    // Создание группы пуль
-    this.bullets = this.physics.add.group({
-      defaultKey: "bullet",
-      setScale: { x: 1, y: 1 }, // Масштабирование пуль
-      maxSize: 1, // Максимальное количество пуль на экране
-    });
-
-    // Удаление пуль за пределами экрана
-    this.bullets.children.iterate((bullet) => {
-      const b = bullet as Phaser.Physics.Arcade.Sprite;
-      if (
-        b.y < 0 ||
-        b.x < 0 ||
-        b.x > this.scale.width ||
-        b.y > this.scale.height
-      ) {
-        b.setActive(false);
-        b.setVisible(false);
-      }
-
-      return true;
-    });
-
-    this.bullets = this.physics.add.group({
-      defaultKey: "bullet",
-      maxSize: 10, // Максимальное количество пуль на экране
-    });
-  }
-
-  createEnemies() {
-    // Создание группы NPC
-    this.enemies = this.physics.add.group({
-      key: "enemy",
-      setScale: { x: 0.2, y: 0.2 }, // Масштабирование врагов
-      repeat: 5, // Количество врагов
-      setXY: { x: 50, y: 50, stepX: 150 }, // Позиционирование врагов
-      classType: Phaser.Physics.Arcade.Sprite,
-    });
-
-    // Настройка движения NPC к игроку
-    this.enemies.children.iterate((enemy) => {
-      const npc = enemy as Phaser.Physics.Arcade.Sprite;
-      npc.setVelocity(
-        Phaser.Math.Between(-100, 100),
-        Phaser.Math.Between(-100, 100)
-      ); // Случайное движение
-
-      return true;
-    });
-  }
-
-  updatePlayerPosition() {
-    const { cursorX, cursorY } = this.detectCursorPosition();
-
-    // Расчет угла между игроком и курсором
-    const playerAngle = Phaser.Math.Angle.Between(
-      this.player.x,
-      this.player.y,
-      cursorX,
-      cursorY
-    );
-
-    // Установка угла спрайта игрока
-    this.player.setRotation(playerAngle + Math.PI / 2);
-  }
-
-  updateEnemyPosition() {
-    // Обработка движения врагов к игроку
-    this.enemies.children.iterate((enemy) => {
-      const npc = enemy as Phaser.Physics.Arcade.Sprite;
-      if (npc.active) {
-        // Расчет угла между врагом и игроком
-
-        const enemyAngle = this.calculateAngleBetweenObjectAndPlayer(
-          this.player,
-          npc
-        );
-
-        // Установка угла спрайта врага с учетом коррекции
-        npc.setRotation(enemyAngle + Math.PI / 2);
-
-        // Двигаем врагов к игроку
-        this.physics.moveToObject(npc, this.player, 100); // Скорость врагов
-      }
-
-      return true;
-    });
-  }
-
-  updateBulletPostion() {
-    // Удаление пуль за пределами экрана
-    this.bullets.children.iterate((bullet) => {
-      const b = bullet as Phaser.Physics.Arcade.Sprite;
-      if (
-        b.y < 0 ||
-        b.x < 0 ||
-        b.x > this.scale.width ||
-        b.y > this.scale.height
-      ) {
-        b.setActive(false);
-        b.setVisible(false);
-      }
-      return true;
-    });
+    return angleMap[direction];
   }
 
   detectCollisions() {
@@ -220,15 +100,20 @@ export class GameScene extends Scene {
       this.renderRestartButton();
     };
 
-    const handleBulletCollision = (bullet, enemy) => {
+    const handleBulletCollision = (bullet, enemy: Enemy) => {
       bullet.destroy();
 
-      enemy.setVisible(false);
-      enemy.setActive(false);
+      enemy.takeDamage(this.player.damage, () => {
+        this.player.lockedEnemy.clearTint();
+        this.player.lockedEnemy = null;
+        this.player.isAttack = false;
+        this.score += 10;
+        this.handleScore().update();
+      });
 
-      // Обновление счета
-      this.updateScore();
-      this.updateScoreText();
+      // enemy.setVisible(false);
+      // enemy.setActive(false);
+      // this.handleScore().update();
     };
 
     const collisions = {
@@ -237,41 +122,32 @@ export class GameScene extends Scene {
     };
 
     // Проверка на столкновение NPC с игроком
-    this.physics.add.overlap(
-      this.player,
-      this.enemies,
-      collisions.enemy,
-      undefined,
-      this
-    );
+    // this.physics.add.overlap(
+    //   this.player,
+    //   this.enemiesSmall,
+    //   collisions.enemy,
+    //   undefined,
+    //   this
+    // );
 
     // Проверка на столкновение пуль с врагами
     this.physics.add.overlap(
       this.bullets,
-      this.enemies,
+      this.enemiesSmall,
       collisions.bullet,
       undefined,
       this
     );
   }
 
-  createScoreText() {
-    this.scoreText = this.add.text(16, 16, `Score: ${this.score}`, {
-      fontSize: "32px",
-      color: "#fff",
-    });
-  }
-
-  updateScoreText() {
-    this.scoreText.setText(`Score: ${this.score}`);
-  }
-
-  updateScore() {
-    this.score += 10;
-  }
-
   shoot(pointer: Phaser.Input.Pointer) {
     if (this.physics.world.isPaused) {
+      return;
+    }
+
+    console.log("Shoot");
+
+    if (!this.player.isAttack) {
       return;
     }
 
@@ -280,73 +156,31 @@ export class GameScene extends Scene {
     if (bullet) {
       bullet.setActive(true);
       bullet.setVisible(true);
+      bullet.setTexture("bullet");
       bullet.setPosition(this.player.x, this.player.y);
-
-      const angle = this.calculateAngleBetweenObjectAndPlayer(
-        this.input,
-        this.player
-      );
+      bullet.setVelocity(1000, 1000);
 
       // Устанавливаем скорость пули в направлении курсора
-      this.physics.velocityFromRotation(angle, 500, bullet.body.velocity);
+      this.physics.velocityFromRotation(
+        this.player.playerCurrentAngle - Math.PI / 2,
+        1000,
+        bullet.body.velocity
+      );
     }
   }
 
-  calculateAngleBetweenObjectAndPlayer(
-    object: Phaser.Physics.Arcade.Sprite | Phaser.Input.InputPlugin,
-    enemy: Phaser.Physics.Arcade.Sprite
-  ) {
-    return Phaser.Math.Angle.Between(enemy.x, enemy.y, object.x, object.y);
-  }
-
   respawnEnemy() {
-    const screenWidth = this.scale.width;
-    const screenHeight = this.scale.height;
-
-    const direction = Phaser.Math.Between(0, 3);
-
-    const spawnPoints = {
-      0: () => ({
-        x: Phaser.Math.Between(0, screenWidth),
-        y: -50, // Вне экрана сверху
-      }),
-      1: () => ({
-        x: screenWidth + 50, // Вне экрана справа
-        y: Phaser.Math.Between(0, screenHeight),
-      }),
-      2: () => ({
-        x: Phaser.Math.Between(0, screenWidth),
-        y: screenHeight + 50, // Вне экрана снизу
-      }),
-      3: () => ({
-        x: -50, // Вне экрана слева
-        y: Phaser.Math.Between(0, screenHeight),
-      }),
-    };
-
-    const { x, y } = spawnPoints[direction]();
-
-    const enemy = this.enemies.get() as Phaser.Physics.Arcade.Sprite;
+    const enemy = this.enemiesSmall.get() as SmallEnemy;
 
     if (enemy) {
-      enemy.setActive(true);
-      enemy.setVisible(true);
-      enemy.setPosition(x, y);
-      enemy.setTexture("enemy");
-      enemy.setScale(0.2);
-      enemy.body.setSize(300, 300);
-
-      enemy.setVelocity(
-        Phaser.Math.Between(-100, 100),
-        Phaser.Math.Between(-100, 100)
-      );
+      enemy.setAttributes(this);
     } else {
       console.warn("No available enemy sprite to respawn");
     }
   }
 
   isEnemyLessThan(count: number) {
-    return this.enemies.countActive() < count;
+    return this.enemiesSmall.countActive() < count;
   }
 
   renderRestartButton() {
@@ -448,7 +282,7 @@ export class GameScene extends Scene {
   hideGameObjects() {
     this.scoreText.setVisible(false);
     this.player.setVisible(false);
-    this.enemies.children.iterate((enemy) => {
+    this.enemiesSmall?.children.iterate((enemy) => {
       const npc = enemy as Phaser.Physics.Arcade.Sprite;
       npc.setVisible(false);
       return true;
@@ -458,7 +292,7 @@ export class GameScene extends Scene {
   showGameObjects() {
     this.scoreText.setVisible(true);
     this.player.setVisible(true);
-    this.enemies.children.iterate((enemy) => {
+    this.enemiesSmall?.children.iterate((enemy) => {
       const npc = enemy as Phaser.Physics.Arcade.Sprite;
       npc.setVisible(true);
       return true;
@@ -466,18 +300,200 @@ export class GameScene extends Scene {
   }
 
   createGameObjects() {
-    this.createPlayer();
-    this.createBullets();
-    this.createEnemies();
-    this.createScoreText();
+    this.createKeyBind();
+    this.handleMap().create();
+    this.handlePlayer().create();
+    this.handleEnemiesSmall().create();
+    this.handleBullets().create();
+    this.handleScore().create();
+    this.handleCoordinates().create();
+  }
+
+  handlePlayer() {
+    return {
+      create: () => {
+        // Добавляем игрока в центр экрана
+        this.player = new Player(
+          this,
+          this.scale.width / 2,
+          this.scale.height / 2,
+          "player",
+          this.keys
+        );
+        this.player.setScale(0.8);
+        this.player.setCollideWorldBounds(true);
+      },
+
+      update: () => {
+        this.player.setPlayerControls();
+        this.player.setPlayerAngleIfLockEnabled();
+      },
+    };
+  }
+
+  handleMap() {
+    return {
+      create: () => {
+        this.map = this.add
+          .tileSprite(0, 0, this.scale.width, this.scale.height, "map")
+          .setOrigin(0, 0)
+          .setScrollFactor(0); // Фиксируем фон, чтобы он не двигался напрямую с камерой
+      },
+
+      update: () => {
+        this.map.tilePositionX = this.cameras.main.scrollX * 0.2; // Двигаем фон по оси X
+        this.map.tilePositionY = this.cameras.main.scrollY * 0.2; // Двигаем фон по оси Y
+      },
+    };
+  }
+
+  handleEnemiesSmall() {
+    return {
+      create: () => {
+        this.enemiesSmall = this.physics.add.group({
+          key: "enemy_small",
+          classType: SmallEnemy, // Указываем, что в группе будут объекты класса Enemy
+          runChildUpdate: true,
+          repeat: 5,
+          active: false,
+          setScale: { x: 0.4, y: 0.4 },
+        });
+
+        this.enemiesSmall?.children.iterate((enemy) => {
+          const npc = enemy as SmallEnemy;
+
+          npc.setAttributes(this);
+          this.player.setEnemyToLockOn(npc);
+          return true;
+        });
+      },
+
+      update: () => {
+        this.enemiesSmall?.children.iterate((enemy) => {
+          const npc = enemy as SmallEnemy;
+          if (npc.active) {
+            // Расчет угла между врагом и игроком
+
+            const enemyAngle = this.player.calculateAngleBetweenObjectAndPlayer(
+              this.player,
+              npc
+            );
+
+            // Установка угла спрайта врага с учетом коррекции
+            npc.setRotation(enemyAngle + Math.PI / 2);
+            npc.handleDamageBar(this).update(npc.health, {
+              x: npc.x,
+              y: npc.y,
+            });
+            // Двигаем врагов к игроку
+            this.physics.moveToObject(npc, this.player, 100); // Скорость врагов
+          }
+
+          return true;
+        });
+      },
+    };
+  }
+
+  handleBullets() {
+    return {
+      create: () => {
+        this.bullets = this.physics.add.group({
+          defaultKey: "bullet",
+          setScale: { x: 1, y: 1 },
+          maxSize: 100,
+          repeat: 100,
+        });
+
+        this.bullets.children.iterate((bullet) => {
+          const b = bullet as Phaser.Physics.Arcade.Sprite;
+          if (
+            b.y < 0 ||
+            b.x < 0 ||
+            b.x > this.scale.width ||
+            b.y > this.scale.height
+          ) {
+            b.setActive(false);
+            b.setVisible(false);
+          }
+
+          return true;
+        });
+      },
+
+      update: () => {
+        this.bullets.children.iterate((bullet) => {
+          const b = bullet as Phaser.Physics.Arcade.Sprite;
+          if (
+            b.y < 0 ||
+            b.x < 0 ||
+            b.x > this.scale.width ||
+            b.y > this.scale.height
+          ) {
+            b.setActive(false);
+            b.setVisible(false);
+          }
+
+          return true;
+        });
+      },
+    };
+  }
+
+  handleScore() {
+    return {
+      create: () => {
+        this.score = 0;
+        this.scoreText = this.add.text(16, 48, `Score: ${this.score}`, {
+          fontSize: "32px",
+          color: "#fff",
+        });
+        this.scoreText.setScrollFactor(0);
+      },
+
+      update: () => {
+        this.scoreText.setText(`Score: ${this.score}`);
+      },
+    };
+  }
+
+  handleCoordinates() {
+    return {
+      create: () => {
+        this.coordinateText = this.add.text(16, 16, "Coordinates", {
+          fontSize: "32px",
+          color: "#fff",
+        });
+        this.coordinateText.setScrollFactor(0);
+      },
+
+      update: () => {
+        const { x, y } = this.player;
+        this.coordinateText.setText(`X: ${x.toFixed(2)}, Y: ${y.toFixed(2)}`);
+      },
+    };
   }
 
   prepareGame() {
-    this.input.on("pointerdown", this.shoot, this);
     this.cursors = this.input.keyboard.createCursorKeys(); // Создание клавиш для управления
   }
 
   setupPhysics() {
     this.physics.world.setBounds(0, 0, this.scale.width, this.scale.height);
+  }
+
+  setControls() {
+    this.keys.space.on("down", this.shoot);
+  }
+
+  createKeyBind() {
+    this.keys = {
+      up: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+      left: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+      down: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+      right: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+      space: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE),
+      ctrl: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.CTRL),
+    };
   }
 }

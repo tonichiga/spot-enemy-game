@@ -1,14 +1,9 @@
 {
   "compilerOptions": {
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext",
-      "scripthost"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext", "scripthost"],
     "allowJs": true,
     "skipLibCheck": true,
-    "strict": true,
+    "strict": false,
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
@@ -19,12 +14,8 @@
     "incremental": true,
     "strictNullChecks": false,
     "noImplicitAny": false,
-    "typeRoots": [
-      "./node_modules/phaser/types"
-    ],
-    "types": [
-      "Phaser"
-    ],
+    "typeRoots": ["./node_modules/phaser/types"],
+    "types": ["Phaser"],
     // "strictBindCallApply": false,
     "plugins": [
       {
@@ -32,9 +23,7 @@
       }
     ],
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"]
     }
   },
   "include": [
@@ -44,7 +33,5 @@
     ".next/types/**/*.ts",
     "dist/types/**/*.ts"
   ],
-  "exclude": [
-    "node_modules"
-  ]
+  "exclude": ["node_modules"]
 }
