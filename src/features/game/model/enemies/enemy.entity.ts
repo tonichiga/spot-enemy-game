@@ -1,4 +1,4 @@
-import { Scene } from "phaser";
+import Phaser, { Scene } from "phaser";
 
 class Enemy extends Phaser.Physics.Arcade.Sprite {
   health: number;
@@ -67,7 +67,7 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
         positions: {
           x: number;
           y: number;
-        }
+        },
       ) => {
         this.damageText = sceneInstance.add.text(
           positions.x - 50,
@@ -76,7 +76,7 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
           {
             fontSize: "16px",
             color: "#fff",
-          }
+          },
         );
       },
 
@@ -85,7 +85,7 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
         positions: {
           x: number;
           y: number;
-        }
+        },
       ) => {
         this.damageText.setText(`Health: ${health}`);
         this.damageText.setPosition(positions.x - 50, positions.y - 80);

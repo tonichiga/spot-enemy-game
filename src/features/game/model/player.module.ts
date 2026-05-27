@@ -1,4 +1,5 @@
 import SmallEnemy from "./enemies/small-enemy";
+import Phaser from "phaser";
 
 class Player extends Phaser.Physics.Arcade.Sprite {
   health: number;
@@ -82,7 +83,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.playerCurrentAngle = Phaser.Math.Angle.RotateTo(
         this.playerCurrentAngle,
         targetAngle,
-        0.2
+        0.2,
       );
     } else {
       this.setVelocity(0, 0);
@@ -133,7 +134,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (this.isAttack && this.lockedEnemy) {
       const angle = this.calculateAngleBetweenObjectAndPlayer(
         this,
-        this.lockedEnemy
+        this.lockedEnemy,
       );
       this.playerCurrentAngle = angle + -Math.PI / 2;
       this.setRotation(this.playerCurrentAngle);
@@ -142,19 +143,21 @@ class Player extends Phaser.Physics.Arcade.Sprite {
 
   calculateAngleBetweenObjectAndPlayer<
     T1 extends Phaser.Physics.Arcade.Sprite | Phaser.Input.InputPlugin,
-    T2 extends Phaser.Physics.Arcade.Sprite | Phaser.Input.InputPlugin
+    T2 extends Phaser.Physics.Arcade.Sprite | Phaser.Input.InputPlugin,
   >(object: T1, enemy: T2): number {
     return Phaser.Math.Angle.Between(enemy.x, enemy.y, object.x, object.y);
   }
 
   setContols() {
-    this.keys.ctrl.on("down", () => {
-      console.log("Space key pressed");
-      if (this.lockedEnemy) {
-        this.isAttack = !this.isAttack;
-        if (this.isAttack) console.log("Enemy locked");
-      }
-    });
+    this.keys.ctrl.on("down", this.prepareAttackEnemy.bind(this));
+  }
+
+  prepareAttackEnemy() {
+    console.log("Space key pressed");
+    if (this.lockedEnemy) {
+      this.isAttack = !this.isAttack;
+      if (this.isAttack) console.log("Enemy locked");
+    }
   }
 
   setEnemyToLockOn(enemy: SmallEnemy) {
@@ -181,33 +184,33 @@ class Player extends Phaser.Physics.Arcade.Sprite {
 
   updatePlayerRotationAndMovement(
     sceneInstance: Phaser.Scene,
-    enemies: Phaser.Physics.Arcade.Group[]
+    enemies: Phaser.Physics.Arcade.Group[],
   ) {
     const pointer = sceneInstance.input.activePointer;
-    const worldX = pointer.x;
-    const worldY = pointer.y;
+    const screenPointerCoords = sceneInstance.cameras.main.getWorldPoint(
+      pointer.x,
+      pointer.y,
+    );
+    const worldX = screenPointerCoords.x;
+    const worldY = screenPointerCoords.y;
 
     this.destination = new Phaser.Math.Vector2();
     this.destination.set(worldX, worldY);
 
-    if (this.isEnemyAtPosition(this.destination.x, this.destination.y, enemies))
+    if (
+      this.isEnemyAtPosition(this.destination.x, this.destination.y, enemies)
+    ) {
+      console.log("Enemy at position, not moving player");
       return;
-
-    const camera = sceneInstance.cameras.main;
-
-    const screenPointerCoords = sceneInstance.cameras.main.getWorldPoint(
-      worldX,
-      worldY
-    );
+    }
 
     // Вычисляем угол между кораблем и текущей позицией курсора
     const targetAngle = Phaser.Math.Angle.Between(
       this.x,
       this.y,
       screenPointerCoords.x,
-      screenPointerCoords.y
+      screenPointerCoords.y,
     );
-    console.log(targetAngle);
 
     // Корректируем угол поворота (если нужно)
     const correctedTargetAngle = targetAngle + Math.PI / 2;
@@ -225,27 +228,24 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   isEnemyAtPosition(
     x: number,
     y: number,
-    enemies: Phaser.Physics.Arcade.Group[]
+    enemies: Phaser.Physics.Arcade.Group[],
   ): boolean {
-    let isAtEnemy = false;
+    for (const group of enemies) {
+      for (const gameObject of group.children) {
+        const enemySprite = gameObject as Phaser.Physics.Arcade.Sprite;
 
-    enemies.forEach((group) => {
-      group.children.iterate((enemy) => {
-        const enemySprite = enemy as Phaser.Physics.Arcade.Sprite;
-        const distance = Phaser.Math.Distance.Between(
-          x,
-          y,
-          enemySprite.x,
-          enemySprite.y
-        );
-        if (distance < enemySprite.width / 2) {
-          isAtEnemy = true;
+        if (!enemySprite.active || !enemySprite.visible) {
+          continue;
         }
-        return true;
-      });
-    });
 
-    return isAtEnemy;
+        const bounds = enemySprite.getBounds();
+        if (bounds.contains(x, y)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 }
 

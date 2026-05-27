@@ -136,7 +136,7 @@ export class GameScene extends Scene {
       this.enemiesSmall,
       collisions.bullet,
       undefined,
-      this
+      this,
     );
   }
 
@@ -164,7 +164,7 @@ export class GameScene extends Scene {
       this.physics.velocityFromRotation(
         this.player.playerCurrentAngle - Math.PI / 2,
         1000,
-        bullet.body.velocity
+        bullet.body.velocity,
       );
     }
   }
@@ -192,7 +192,7 @@ export class GameScene extends Scene {
         {
           fontSize: "64px",
           color: "#fff",
-        }
+        },
       )
       .setScrollFactor(0);
 
@@ -246,7 +246,7 @@ export class GameScene extends Scene {
       this.scale.width / 2,
       this.scale.height / 2 - 50,
       "Start Game",
-      { fontSize: "32px", color: "#fff" }
+      { fontSize: "32px", color: "#fff" },
     );
     this.startText.setOrigin(0.5);
 
@@ -254,7 +254,7 @@ export class GameScene extends Scene {
       this.scale.width / 2,
       this.scale.height / 2,
       "Click to Start",
-      { fontSize: "24px", color: "#f39c12" }
+      { fontSize: "24px", color: "#f39c12" },
     );
     this.startButton.setOrigin(0.5);
     this.startButton.setInteractive();
@@ -282,20 +282,18 @@ export class GameScene extends Scene {
   hideGameObjects() {
     this.scoreText.setVisible(false);
     this.player.setVisible(false);
-    this.enemiesSmall?.children.iterate((enemy) => {
+    this.enemiesSmall?.children.forEach((enemy) => {
       const npc = enemy as Phaser.Physics.Arcade.Sprite;
       npc.setVisible(false);
-      return true;
     });
   }
 
   showGameObjects() {
     this.scoreText.setVisible(true);
     this.player.setVisible(true);
-    this.enemiesSmall?.children.iterate((enemy) => {
+    this.enemiesSmall?.children.forEach((enemy) => {
       const npc = enemy as Phaser.Physics.Arcade.Sprite;
       npc.setVisible(true);
-      return true;
     });
   }
 
@@ -318,7 +316,7 @@ export class GameScene extends Scene {
           this.scale.width / 2,
           this.scale.height / 2,
           "player",
-          this.keys
+          this.keys,
         );
         this.player.setScale(0.8);
         this.player.setCollideWorldBounds(true);
@@ -359,24 +357,23 @@ export class GameScene extends Scene {
           setScale: { x: 0.4, y: 0.4 },
         });
 
-        this.enemiesSmall?.children.iterate((enemy) => {
+        this.enemiesSmall?.children.forEach((enemy) => {
           const npc = enemy as SmallEnemy;
 
           npc.setAttributes(this);
           this.player.setEnemyToLockOn(npc);
-          return true;
         });
       },
 
       update: () => {
-        this.enemiesSmall?.children.iterate((enemy) => {
+        this.enemiesSmall?.children.forEach((enemy) => {
           const npc = enemy as SmallEnemy;
           if (npc.active) {
             // Расчет угла между врагом и игроком
 
             const enemyAngle = this.player.calculateAngleBetweenObjectAndPlayer(
               this.player,
-              npc
+              npc,
             );
 
             // Установка угла спрайта врага с учетом коррекции
@@ -388,8 +385,6 @@ export class GameScene extends Scene {
             // Двигаем врагов к игроку
             this.physics.moveToObject(npc, this.player, 100); // Скорость врагов
           }
-
-          return true;
         });
       },
     };
@@ -402,39 +397,40 @@ export class GameScene extends Scene {
           defaultKey: "bullet",
           setScale: { x: 1, y: 1 },
           maxSize: 100,
-          repeat: 100,
         });
 
-        this.bullets.children.iterate((bullet) => {
+        this.bullets.children.forEach((bullet) => {
           const b = bullet as Phaser.Physics.Arcade.Sprite;
+          const worldBounds = this.physics.world.bounds;
+          const padding = 32;
+
           if (
-            b.y < 0 ||
-            b.x < 0 ||
-            b.x > this.scale.width ||
-            b.y > this.scale.height
+            b.y < worldBounds.top - padding ||
+            b.x < worldBounds.left - padding ||
+            b.x > worldBounds.right + padding ||
+            b.y > worldBounds.bottom + padding
           ) {
             b.setActive(false);
             b.setVisible(false);
           }
-
-          return true;
         });
       },
 
       update: () => {
-        this.bullets.children.iterate((bullet) => {
+        this.bullets.children.forEach((bullet) => {
           const b = bullet as Phaser.Physics.Arcade.Sprite;
+          const worldBounds = this.physics.world.bounds;
+          const padding = 32;
+
           if (
-            b.y < 0 ||
-            b.x < 0 ||
-            b.x > this.scale.width ||
-            b.y > this.scale.height
+            b.y < worldBounds.top - padding ||
+            b.x < worldBounds.left - padding ||
+            b.x > worldBounds.right + padding ||
+            b.y > worldBounds.bottom + padding
           ) {
             b.setActive(false);
             b.setVisible(false);
           }
-
-          return true;
         });
       },
     };
