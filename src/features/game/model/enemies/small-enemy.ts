@@ -1,4 +1,4 @@
-import { Scene } from "phaser";
+import Phaser, { Scene } from "phaser";
 import Enemy from "./enemy.entity";
 
 class SmallEnemy extends Enemy {

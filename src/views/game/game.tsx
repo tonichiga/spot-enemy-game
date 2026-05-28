@@ -1,6 +1,6 @@
 "use client";
 import { GameScene } from "@/features";
-import { AUTO, Game } from "phaser";
+import Phaser, { AUTO, Game } from "phaser";
 import { useEffect } from "react";
 
 //  Find out more information about the Game Config at:

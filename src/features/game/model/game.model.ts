@@ -2,11 +2,12 @@ import { Scene } from "phaser";
 import SmallEnemy from "./enemies/small-enemy";
 import Player from "./player.module";
 import Enemy from "./enemies/enemy.entity";
+import Phaser from "phaser";
 
 export class GameScene extends Scene {
   cursors: Phaser.Types.Input.Keyboard.CursorKeys;
   player: Player;
-  enemiesSmall: Phaser.Physics.Arcade.Group;
+  smallEnemiesGroup: Phaser.Physics.Arcade.Group;
   bullets: Phaser.Physics.Arcade.Group;
   map: Phaser.GameObjects.TileSprite;
   score: number = 0;
@@ -65,12 +66,14 @@ export class GameScene extends Scene {
   update() {
     this.handleMap().update();
     this.handlePlayer().update();
-    this.handleEnemiesSmall().update();
+    this.handlesmallEnemiesGroup().update();
     this.handleBullets().update();
     this.handleCoordinates().update();
 
     if (this.input.activePointer.isDown) {
-      this.player.updatePlayerRotationAndMovement(this, [this.enemiesSmall]);
+      this.player.updatePlayerRotationAndMovement(this, [
+        this.smallEnemiesGroup,
+      ]);
     }
 
     if (this.isEnemyLessThan(6)) this.respawnEnemy();
@@ -91,6 +94,31 @@ export class GameScene extends Scene {
     return angleMap[direction];
   }
 
+  isEnemyCloseToPlayer(enemy: SmallEnemy) {
+    const distanceToPlayer = Phaser.Math.Distance.Between(
+      enemy.x,
+      enemy.y,
+      this.player.x,
+      this.player.y,
+    );
+
+    const playerRadius =
+      Math.max(this.player.displayWidth, this.player.displayHeight) / 2;
+    const enemyRadius = Math.max(enemy.displayWidth, enemy.displayHeight) / 2;
+    const stopDistance = playerRadius + enemyRadius + 4;
+
+    return distanceToPlayer <= stopDistance;
+  }
+
+  moveEnemyToPlayer(enemy: SmallEnemy, speed: number = 100) {
+    if (this.isEnemyCloseToPlayer(enemy)) {
+      enemy.setVelocity(0, 0);
+      return;
+    }
+
+    this.physics.moveToObject(enemy, this.player, speed);
+  }
+
   detectCollisions() {
     const handleEnemyCollision = (_, enemy) => {
       enemy.setVisible(false);
@@ -104,6 +132,7 @@ export class GameScene extends Scene {
       bullet.destroy();
 
       enemy.takeDamage(this.player.damage, () => {
+        if (!this.player.lockedEnemy) return;
         this.player.lockedEnemy.clearTint();
         this.player.lockedEnemy = null;
         this.player.isAttack = false;
@@ -124,7 +153,7 @@ export class GameScene extends Scene {
     // Проверка на столкновение NPC с игроком
     // this.physics.add.overlap(
     //   this.player,
-    //   this.enemiesSmall,
+    //   this.smallEnemiesGroup,
     //   collisions.enemy,
     //   undefined,
     //   this
@@ -133,7 +162,7 @@ export class GameScene extends Scene {
     // Проверка на столкновение пуль с врагами
     this.physics.add.overlap(
       this.bullets,
-      this.enemiesSmall,
+      this.smallEnemiesGroup,
       collisions.bullet,
       undefined,
       this,
@@ -170,7 +199,7 @@ export class GameScene extends Scene {
   }
 
   respawnEnemy() {
-    const enemy = this.enemiesSmall.get() as SmallEnemy;
+    const enemy = this.smallEnemiesGroup.get() as SmallEnemy;
 
     if (enemy) {
       enemy.setAttributes(this);
@@ -180,7 +209,7 @@ export class GameScene extends Scene {
   }
 
   isEnemyLessThan(count: number) {
-    return this.enemiesSmall.countActive() < count;
+    return this.smallEnemiesGroup.countActive() < count;
   }
 
   renderRestartButton() {
@@ -282,7 +311,7 @@ export class GameScene extends Scene {
   hideGameObjects() {
     this.scoreText.setVisible(false);
     this.player.setVisible(false);
-    this.enemiesSmall?.children.forEach((enemy) => {
+    this.smallEnemiesGroup?.children.forEach((enemy) => {
       const npc = enemy as Phaser.Physics.Arcade.Sprite;
       npc.setVisible(false);
     });
@@ -291,7 +320,7 @@ export class GameScene extends Scene {
   showGameObjects() {
     this.scoreText.setVisible(true);
     this.player.setVisible(true);
-    this.enemiesSmall?.children.forEach((enemy) => {
+    this.smallEnemiesGroup?.children.forEach((enemy) => {
       const npc = enemy as Phaser.Physics.Arcade.Sprite;
       npc.setVisible(true);
     });
@@ -301,7 +330,7 @@ export class GameScene extends Scene {
     this.createKeyBind();
     this.handleMap().create();
     this.handlePlayer().create();
-    this.handleEnemiesSmall().create();
+    this.handlesmallEnemiesGroup().create();
     this.handleBullets().create();
     this.handleScore().create();
     this.handleCoordinates().create();
@@ -345,10 +374,10 @@ export class GameScene extends Scene {
     };
   }
 
-  handleEnemiesSmall() {
+  handlesmallEnemiesGroup() {
     return {
       create: () => {
-        this.enemiesSmall = this.physics.add.group({
+        this.smallEnemiesGroup = this.physics.add.group({
           key: "enemy_small",
           classType: SmallEnemy, // Указываем, что в группе будут объекты класса Enemy
           runChildUpdate: true,
@@ -357,7 +386,7 @@ export class GameScene extends Scene {
           setScale: { x: 0.4, y: 0.4 },
         });
 
-        this.enemiesSmall?.children.forEach((enemy) => {
+        this.smallEnemiesGroup?.children.forEach((enemy) => {
           const npc = enemy as SmallEnemy;
 
           npc.setAttributes(this);
@@ -366,7 +395,7 @@ export class GameScene extends Scene {
       },
 
       update: () => {
-        this.enemiesSmall?.children.forEach((enemy) => {
+        this.smallEnemiesGroup?.children.forEach((enemy) => {
           const npc = enemy as SmallEnemy;
           if (npc.active) {
             // Расчет угла между врагом и игроком
@@ -382,8 +411,8 @@ export class GameScene extends Scene {
               x: npc.x,
               y: npc.y,
             });
-            // Двигаем врагов к игроку
-            this.physics.moveToObject(npc, this.player, 100); // Скорость врагов
+            // Двигаем врагов к игроку и останавливаем вблизи модели игрока
+            this.moveEnemyToPlayer(npc, 100);
           }
         });
       },

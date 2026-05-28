@@ -58,6 +58,7 @@ class Enemy extends Phaser.Physics.Arcade.Sprite {
   die() {
     this.setActive(false);
     this.setVisible(false);
+    this.damageText.destroy();
   }
 
   handleDamageBar(sceneInstance: Scene) {
